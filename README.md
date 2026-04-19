@@ -26,12 +26,20 @@ Working with Claude as:
 
 10–15 hours/week. First 30 days after specialization is picked: ~1 textbook chapter + 1 small coding exercise + 2–3 paper summaries per week.
 
+## Current specialization
+
+**A + E — fusion plasma physics (anchor) + ML-for-physics (method).**
+
+Fusion gives direct leverage on the energy half of the goal and a live frontier where computational and ML contributions are publishing now. ML-for-physics is the method layer applied on top — neural operators, PINNs, differentiable sim — starting from correctness-verified classical solvers. In-space propulsion (Track B) stays on deck as a second-track option. Gravitation/GR (Track D) stays as side-reading for the honest anti-gravity frontier engagement.
+
+Full rationale: `decisions/001-specialization.md`.
+
 ## Current state
 
 - [x] Repo skeleton
-- [ ] Specialization decision (`decisions/001-specialization.md`)
-- [ ] First-month plan (`log/2026-04-first-month.md`) — written after specialization is picked
-- [ ] First on-ramp project in `code/`
+- [x] Specialization decision (`decisions/001-specialization.md`)
+- [x] First-month plan (`log/2026-04-first-month.md`)
+- [x] First on-ramp project scaffolded (`code/mhd-1d/`) — Week 1 advection solver landed; Euler (Week 2) and MHD (Week 3) pending
 
 ## Anti-stall rule
 

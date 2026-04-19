@@ -1,8 +1,12 @@
 # Decision 001 — Pick a specialization track
 
-**Status:** open
+**Status:** accepted (2026-04-19)
 **Date:** 2026-04-19
 **Owner:** Cenni
+
+## Accepted: A + E (fusion + ML-for-physics)
+
+Rationale: the matrix ranks E highest (22) on pure scoring, but E is a *method* — not a domain. Paired with a domain anchor, A (fusion) has the highest direct leverage on the energy half of the stated goal and a live industrial frontier where ML-for-physics results are publishing *now* (plasma surrogates, tokamak control, disruption prediction). B+E stays on the list as a swap option if transportation ever pulls harder. D (gravitation) remains as side-reading for the honest anti-gravity engagement — not as the primary bet.
 
 ## Why this decision matters
 
