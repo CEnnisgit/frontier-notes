@@ -1,0 +1,60 @@
+# papers — PDFs are not ours to redistribute
+papers/**/*.pdf
+papers/**/*.djvu
+papers/**/*.epub
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# julia
+*.jl.cov
+*.jl.mem
+Manifest.toml
+
+# jupyter
+.ipynb_checkpoints/
+
+# build artifacts
+build/
+dist/
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+*.out
+
+# simulation outputs (usually large; regenerate from code)
+code/**/output/
+code/**/outputs/
+code/**/results/
+code/**/*.h5
+code/**/*.hdf5
+code/**/*.vtk
+code/**/*.vtu
+code/**/*.npz
+
+# editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# secrets (defense in depth — shouldn't be in repo ever)
+.env
+.env.*
+*.key
+*.pem
+credentials.json
