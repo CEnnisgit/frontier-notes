@@ -1,0 +1,28 @@
+[package]
+name = "mhd-1d"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "1D ideal-MHD HLL solver with Sod / Brio-Wu verification"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+ndarray = { workspace = true }
+
+[dev-dependencies]
+plotters = { workspace = true }
+anyhow = { workspace = true }
+
+[[example]]
+name = "advection_demo"
+path = "examples/advection_demo.rs"
+
+[[example]]
+name = "plot_sod"
+path = "examples/plot_sod.rs"
+
+[[example]]
+name = "plot_brio_wu"
+path = "examples/plot_brio_wu.rs"

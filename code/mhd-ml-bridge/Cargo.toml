@@ -1,0 +1,25 @@
+[package]
+name = "mhd-ml-bridge"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+description = "Brio-Wu MLP surrogate (candle) — end-to-end scaffold for the ML method layer"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+mhd-1d = { path = "../mhd-1d" }
+ndarray = { workspace = true }
+candle-core = { workspace = true }
+candle-nn = { workspace = true }
+rand = { workspace = true }
+rand_distr = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+plotters = { workspace = true }
+
+[[example]]
+name = "train"
+path = "examples/train.rs"

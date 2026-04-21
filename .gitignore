@@ -21,6 +21,10 @@ env/
 *.jl.mem
 Manifest.toml
 
+# rust / cargo
+code/target/
+code/**/target/
+
 # jupyter
 .ipynb_checkpoints/
 
