@@ -7,3 +7,4 @@
 
 pub mod data;
 pub mod surrogate;
+pub mod sweep;

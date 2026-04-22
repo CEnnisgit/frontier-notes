@@ -33,8 +33,14 @@ pub fn sample_params(rng: &mut StdRng) -> [f32; 7] {
     ]
 }
 
-/// Run HLL MHD on a single parameter vector; return (4, N_OUT) primitives at t=T_FINAL.
+/// Run HLL MHD on a single parameter vector at γ=GAMMA.
 pub fn run_one(params: &[f32; 7]) -> Array2<f64> {
+    run_one_with_gamma(params, GAMMA)
+}
+
+/// Run HLL MHD on a single parameter vector at arbitrary γ; return (4, N_OUT)
+/// primitives at `t = T_FINAL`. Used by the sweep harness to probe γ-OOD.
+pub fn run_one_with_gamma(params: &[f32; 7], gamma: f64) -> Array2<f64> {
     let [rho_l, p_l, by_l, rho_r, p_r, by_r, bx] = params.map(|x| x as f64);
     let dx = 1.0 / N_SIM as f64;
 
@@ -57,9 +63,9 @@ pub fn run_one(params: &[f32; 7]) -> Array2<f64> {
             by[i] = by_r;
         }
     }
-    let u0 = primitive_to_conservative(&rho, &u, &v, &w, &by, &bz, &p, GAMMA, bx);
-    let u_final = mhd_simulate(&u0, dx, T_FINAL, GAMMA, bx, 0.4);
-    let s = conservative_to_primitive(&u_final, GAMMA, bx);
+    let u0 = primitive_to_conservative(&rho, &u, &v, &w, &by, &bz, &p, gamma, bx);
+    let u_final = mhd_simulate(&u0, dx, T_FINAL, gamma, bx, 0.4);
+    let s = conservative_to_primitive(&u_final, gamma, bx);
 
     // Downsample N_SIM -> N_OUT by block-mean.
     let ratio = N_SIM / N_OUT;

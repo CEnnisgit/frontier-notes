@@ -43,6 +43,17 @@ impl Module for Mlp {
     }
 }
 
+/// Z-score normalization stats fit on the training set. Used both during
+/// training (to normalize inputs and targets) and by downstream consumers
+/// (`sweep.rs`) to apply the same transform at eval time.
+pub struct Stats {
+    pub x_mean: Vec<f32>,
+    pub x_std: Vec<f32>,
+    pub y_mean: Vec<f32>,
+    pub y_std: Vec<f32>,
+    pub device: Device,
+}
+
 pub struct TrainResult {
     pub train_hist: Vec<f32>,
     pub val_hist: Vec<f32>,
@@ -99,7 +110,38 @@ fn normalize_rows<const N: usize>(
         .collect()
 }
 
-pub fn train() -> Result<TrainResult> {
+/// Apply the trained MLP to a batch of raw (unnormalized) parameter vectors.
+/// Returns unnormalized predictions matching the HLL output layout.
+pub fn predict(
+    mlp: &Mlp,
+    stats: &Stats,
+    inputs: &[[f32; N_FEATURES]],
+) -> Result<Vec<[f32; N_OUTPUTS]>> {
+    if inputs.is_empty() {
+        return Ok(Vec::new());
+    }
+    let x_mean_arr: [f32; N_FEATURES] = stats.x_mean.as_slice().try_into().unwrap();
+    let x_std_arr: [f32; N_FEATURES] = stats.x_std.as_slice().try_into().unwrap();
+    let x_n = normalize_rows(inputs, &x_mean_arr, &x_std_arr);
+    let x_t = rows_to_tensor(&x_n, &stats.device)?;
+    let y_n_t = mlp.forward(&x_t)?;
+    let y_n_vec: Vec<Vec<f32>> = y_n_t.to_vec2::<f32>()?;
+    let mut out = Vec::with_capacity(inputs.len());
+    for row in y_n_vec.iter() {
+        let mut a = [0.0f32; N_OUTPUTS];
+        for j in 0..N_OUTPUTS {
+            a[j] = row[j] * (stats.y_std[j] + 1e-8) + stats.y_mean[j];
+        }
+        out.push(a);
+    }
+    Ok(out)
+}
+
+/// Train the MLP and return the model + stats + full training history. The
+/// training loop here is the canonical Week-4 recipe (AdamW wd=0, 800 epochs,
+/// batch=16, lr=1e-3, seed=0). Per-field reporting lives in `train()` so
+/// callers that only want the model don't pay for it.
+pub fn train_model() -> Result<(Mlp, VarMap, Stats, TrainResult)> {
     let device = Device::Cpu;
     println!("generating data...");
     let train_ds = build_dataset(N_TRAIN, SEED);
@@ -166,7 +208,7 @@ pub fn train() -> Result<TrainResult> {
         }
     }
 
-    // Final predictions, denormalized.
+    // Final predictions on the validation set, denormalized.
     let val_pred_n = mlp.forward(&x_val_t)?;
     let val_pred_vec: Vec<Vec<f32>> = val_pred_n.to_vec2::<f32>()?;
 
@@ -179,46 +221,93 @@ pub fn train() -> Result<TrainResult> {
         val_pred_arr.push(a);
     }
 
-    // Per-field rMSE report on the unnormalized predictions vs truth.
-    let field_names = ["rho", "u", "By", "p"];
-    println!("\nval MSE per field (unnormalized):");
-    let mut field_rmse = [0.0f32; 4];
-    for (f, name) in field_names.iter().enumerate() {
-        let mut sq = 0.0f64;
-        let mut n = 0usize;
-        let mut mn = f32::INFINITY;
-        let mut mx = f32::NEG_INFINITY;
-        for i in 0..N_VAL {
-            for j in 0..N_OUT {
-                let idx = f * N_OUT + j;
-                let truth = val_ds.outputs[i][idx];
-                let d = (val_pred_arr[i][idx] - truth) as f64;
-                sq += d * d;
-                n += 1;
-                if truth < mn {
-                    mn = truth;
-                }
-                if truth > mx {
-                    mx = truth;
-                }
-            }
-        }
-        let mse = (sq / n as f64) as f32;
-        let rng_ = mx - mn;
-        let rmse_over_range = mse.sqrt() / rng_;
-        field_rmse[f] = rmse_over_range;
-        println!(
-            "  {:>3}: MSE={:.4e}   range={:.3}   rMSE/range={:.3}",
-            name, mse, rng_, rmse_over_range
-        );
-    }
+    let (field_rmse, _) = per_field_rmse_over_range(&val_ds.outputs, &val_pred_arr);
 
-    Ok(TrainResult {
+    let stats = Stats {
+        x_mean: x_mean.to_vec(),
+        x_std: x_std.to_vec(),
+        y_mean: y_mean.to_vec(),
+        y_std: y_std.to_vec(),
+        device,
+    };
+
+    let tr = TrainResult {
         train_hist,
         val_hist,
         val_inputs: val_ds.inputs.clone(),
         val_truth: val_ds.outputs.clone(),
         val_pred: val_pred_arr,
         field_rmse_over_range: field_rmse,
-    })
+    };
+    Ok((mlp, varmap, stats, tr))
+}
+
+/// Per-field rMSE over range, one pass over a batch of truth + prediction
+/// rows laid out as `[rho | u | By | p]` of length N_OUT each.
+/// Returns `(rmse_over_range, mse)` so callers can log both.
+pub fn per_field_rmse_over_range(
+    truth: &[[f32; N_OUTPUTS]],
+    pred: &[[f32; N_OUTPUTS]],
+) -> ([f32; 4], [f32; 4]) {
+    assert_eq!(truth.len(), pred.len());
+    let mut rmse_over_range = [0.0f32; 4];
+    let mut mse_out = [0.0f32; 4];
+    for f in 0..4 {
+        let mut sq = 0.0f64;
+        let mut n = 0usize;
+        let mut mn = f32::INFINITY;
+        let mut mx = f32::NEG_INFINITY;
+        for (t_row, p_row) in truth.iter().zip(pred.iter()) {
+            for j in 0..N_OUT {
+                let idx = f * N_OUT + j;
+                let t = t_row[idx];
+                let d = (p_row[idx] - t) as f64;
+                sq += d * d;
+                n += 1;
+                if t < mn {
+                    mn = t;
+                }
+                if t > mx {
+                    mx = t;
+                }
+            }
+        }
+        let mse = (sq / n as f64) as f32;
+        let rng_ = (mx - mn).max(1e-8);
+        rmse_over_range[f] = mse.sqrt() / rng_;
+        mse_out[f] = mse;
+    }
+    (rmse_over_range, mse_out)
+}
+
+/// Back-compat entry point: trains the model and prints the per-field report
+/// to stdout, then returns the `TrainResult`.
+pub fn train() -> Result<TrainResult> {
+    let (_, _, _, tr) = train_model()?;
+    let field_names = ["rho", "u", "By", "p"];
+    let (rmse, mse) = per_field_rmse_over_range(&tr.val_truth, &tr.val_pred);
+    println!("\nval MSE per field (unnormalized):");
+    for f in 0..4 {
+        // Re-derive range for display only.
+        let (mut mn, mut mx) = (f32::INFINITY, f32::NEG_INFINITY);
+        for row in tr.val_truth.iter() {
+            for j in 0..N_OUT {
+                let t = row[f * N_OUT + j];
+                if t < mn {
+                    mn = t;
+                }
+                if t > mx {
+                    mx = t;
+                }
+            }
+        }
+        println!(
+            "  {:>3}: MSE={:.4e}   range={:.3}   rMSE/range={:.3}",
+            field_names[f],
+            mse[f],
+            mx - mn,
+            rmse[f]
+        );
+    }
+    Ok(tr)
 }
