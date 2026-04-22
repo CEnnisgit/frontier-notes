@@ -127,4 +127,64 @@ Do not push harder. Pushing harder is how multi-year plans die.
 
 ## Retrospective
 
-*(Fill in at end of Week 4.)*
+*Written 2026-04-21 at the close of Month 1.*
+
+### Deliverables landed
+
+- **Week 1 — advection.** `code/mhd-1d/` — upwind FV solver, periodic BC,
+  Gaussian-translation convergence study (orders approaching 1.0 as expected),
+  tests green.
+- **Week 2 — Euler.** HLL flux + exact Riemann (Toro §4.2–4.5 Newton iteration)
+  as the reference. Sod shock tube passes the 2% L1 threshold at N=400, t=0.2.
+  4-panel figure under `figures/sod.png`.
+- **Week 3 — ideal MHD.** 7-variable conservative form, HLL with fast
+  magnetosonic wave speeds, transmissive BCs. Brio-Wu (γ=2, B_x=0.75, t=0.1):
+  conservation holds to machine precision, center density inside the expected
+  `[0.55, 0.80]` band, `B_y` flips sign across the domain. 4-panel figure
+  under `figures/brio-wu.png`.
+- **Week 4 — ML bridge.** `code/mhd-ml-bridge/` — candle MLP (7→128→128→256,
+  GELU, AdamW wd=0, 800 epochs) trained on a 128-example parameter sweep
+  around Brio-Wu. Val rMSE/range ≈ 1–2% per field, training curve + held-out
+  prediction figure both under `figures/`.
+- **Degrave 2022 summary.** `papers/summaries/degrave-2022-tokamak-rl.md` —
+  5-question deep read, with the "nearest thing I could build in a week"
+  feeding directly into Month 2 Week 7–8 (pendulum-on-cart PID vs RL).
+- **Bonus.** `notes/plasma/research-questions.md` — 14 open questions across
+  shape control, disruption, transport, method-layer, and cross-device
+  transfer; each tagged `[now]`/`[soon]`/`[later]`. This is the backlog
+  Month 2+ draws from.
+- **Mid-month pivot.** Full refactor of Month 1 code from Python/JAX to
+  Rust + candle (workspace at `code/`, 21 tests green). All Python sources
+  deleted from main at commit `66f532f`.
+
+### Hours actually spent per week
+
+Informally tracked; not rigorously logged. Roughly in-budget (10–15 hr/week)
+for Weeks 1–3; Week 4 + Rust refactor pushed slightly over, but the refactor
+was an unplanned scope expansion and the normal week-4 work stayed inside
+the budget.
+
+### One thing that was harder than expected
+
+*(Fill in.)*
+
+### One thing that was easier than expected
+
+*(Fill in.)*
+
+### Top-of-mind question entering Month 2
+
+**Where does the MLP surrogate visibly break, and what does the failure mode
+tell us about where physics needs to be encoded?** The Week-4 scaffold got
+~1–2% per-field rMSE on a tight parameter box — that's the *easy* regime.
+Week 5 will widen the envelope (flipped-sign `B_y`, wider `ρ` ratios, γ
+sweep, `B_x` outside [0.6, 0.9]) until the model breaks, and characterize
+how it breaks (shock smearing, contact-discontinuity drift, sign-structure
+loss, blow-up). The answer to this question determines whether the
+method-layer is load-bearing (fixing it requires physics constraints) or
+decorative (a bigger/deeper MLP is enough).
+
+### What's next
+
+See `log/2026-05-second-month.md` — four weeks, Q10 → Q11 → Q1 per the
+research-questions doc.
