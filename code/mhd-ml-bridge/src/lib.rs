@@ -6,5 +6,6 @@
 //! what this is and isn't.
 
 pub mod data;
+pub mod operator;
 pub mod surrogate;
 pub mod sweep;

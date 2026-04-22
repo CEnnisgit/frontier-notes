@@ -92,3 +92,33 @@ and the numbers will get worse in an informative way. That is Week 5.
   interpretation.
 
 None of that is in this scaffold and none of it is promised for Month 1.
+
+## Comparison — DeepONet vs wide-MLP (Week 6, Q11)
+
+Both models trained on the *widened* Week-6 distribution (randomized `By`
+sign, `rho_R ∈ [0.05, 0.40]`, `B_x ∈ [0.0, 1.5]`) with identical optimizer,
+epoch budget, and training-set size (`N_train = 96`).
+
+**In-distribution validation rMSE/range:**
+
+| model          | rho   | u     | By    | p     |
+|----------------|-------|-------|-------|-------|
+| wide MLP       | 0.021 | 0.060 | 0.065 | 0.037 |
+| DeepONet       | 0.033 | 0.084 | 0.121 | 0.060 |
+
+**Q10 sweep stress-test — worst `sum(per-field rMSE/range)` per axis:**
+
+| axis          | wide MLP | DeepONet |
+|---------------|----------|----------|
+| rho_ratio     | 0.435    | 0.505    |
+| by_sign_flip  | 0.231    | 0.359    |
+| gamma         | 0.308    | 0.321    |
+| bx            | 0.324    | 0.441    |
+
+DeepONet loses on every axis, both in- and out-of-distribution. This
+matches the Q10 prediction: failure is about training-distribution
+coverage, not output representation. The rank-`LATENT_D` branch-trunk
+bottleneck is a constraint, not a help, on a fixed-grid compress-and-
+decompress task at this data scale (96 examples). Figures at
+`figures/operator/{training_curve,val_example,sweep_compare}.png`.
+Reproduce: `cargo run -p mhd-ml-bridge --example train_operator --release`.

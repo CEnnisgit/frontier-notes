@@ -3,7 +3,7 @@
 //! Scaffolding, not science. The point is to prove the stack runs end-to-end:
 //!   classical solver -> training data -> candle MLP -> predictions on held-out.
 
-use crate::data::{build_dataset, N_FEATURES, N_OUT, N_OUTPUTS};
+use crate::data::{build_dataset, build_dataset_wide, Dataset, N_FEATURES, N_OUT, N_OUTPUTS};
 use anyhow::Result;
 use candle_core::{DType, Device, Tensor};
 use candle_nn::{AdamW, Linear, Module, Optimizer, ParamsAdamW, VarBuilder, VarMap};
@@ -63,13 +63,13 @@ pub struct TrainResult {
     pub field_rmse_over_range: [f32; 4],
 }
 
-fn rows_to_tensor<const N: usize>(rows: &[[f32; N]], device: &Device) -> Result<Tensor> {
+pub(crate) fn rows_to_tensor<const N: usize>(rows: &[[f32; N]], device: &Device) -> Result<Tensor> {
     let n = rows.len();
     let flat: Vec<f32> = rows.iter().flat_map(|r| r.iter().copied()).collect();
     Ok(Tensor::from_vec(flat, (n, N), device)?)
 }
 
-fn column_stats<const N: usize>(rows: &[[f32; N]]) -> ([f32; N], [f32; N]) {
+pub(crate) fn column_stats<const N: usize>(rows: &[[f32; N]]) -> ([f32; N], [f32; N]) {
     let n = rows.len() as f32;
     let mut mean = [0.0f32; N];
     for row in rows {
@@ -94,7 +94,7 @@ fn column_stats<const N: usize>(rows: &[[f32; N]]) -> ([f32; N], [f32; N]) {
     (mean, std)
 }
 
-fn normalize_rows<const N: usize>(
+pub(crate) fn normalize_rows<const N: usize>(
     rows: &[[f32; N]],
     mean: &[f32; N],
     std: &[f32; N],
@@ -137,15 +137,30 @@ pub fn predict(
     Ok(out)
 }
 
-/// Train the MLP and return the model + stats + full training history. The
-/// training loop here is the canonical Week-4 recipe (AdamW wd=0, 800 epochs,
-/// batch=16, lr=1e-3, seed=0). Per-field reporting lives in `train()` so
-/// callers that only want the model don't pay for it.
+/// Train the MLP on the narrow Week-4 distribution.
 pub fn train_model() -> Result<(Mlp, VarMap, Stats, TrainResult)> {
-    let device = Device::Cpu;
-    println!("generating data...");
+    println!("generating data (narrow Week-4 distribution)...");
     let train_ds = build_dataset(N_TRAIN, SEED);
     let val_ds = build_dataset(N_VAL, SEED + 1);
+    train_on_datasets(train_ds, val_ds)
+}
+
+/// Train the MLP on the widened Week-6 distribution (randomized `By` signs,
+/// wider `rho_R`, wider `B_x`). Fair-comparison baseline against DeepONet.
+pub fn train_model_wide() -> Result<(Mlp, VarMap, Stats, TrainResult)> {
+    println!("generating data (widened Week-6 distribution)...");
+    let train_ds = build_dataset_wide(N_TRAIN, SEED);
+    let val_ds = build_dataset_wide(N_VAL, SEED + 1);
+    train_on_datasets(train_ds, val_ds)
+}
+
+/// Shared training core. Canonical Week-4 recipe (AdamW wd=0, 800 epochs,
+/// batch=16, lr=1e-3, seed=0). Normalization stats fit on the training set.
+pub fn train_on_datasets(
+    train_ds: Dataset,
+    val_ds: Dataset,
+) -> Result<(Mlp, VarMap, Stats, TrainResult)> {
+    let device = Device::Cpu;
 
     let (x_mean, x_std) = column_stats::<N_FEATURES>(&train_ds.inputs);
     let (y_mean, y_std) = column_stats::<N_OUTPUTS>(&train_ds.outputs);

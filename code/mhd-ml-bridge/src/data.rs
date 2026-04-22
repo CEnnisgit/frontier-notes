@@ -20,7 +20,7 @@ pub const N_OUT: usize = 64;
 pub const N_FEATURES: usize = 7;
 pub const N_OUTPUTS: usize = 4 * N_OUT; // rho, u, By, p
 
-/// Draw a single 7-vector of Brio-Wu-ish parameters.
+/// Draw a single 7-vector of Brio-Wu-ish parameters, narrow Week-4 box.
 pub fn sample_params(rng: &mut StdRng) -> [f32; 7] {
     [
         rng.gen_range(0.8..1.2),    // rho_L
@@ -30,6 +30,28 @@ pub fn sample_params(rng: &mut StdRng) -> [f32; 7] {
         rng.gen_range(0.08..0.12),  // p_R
         rng.gen_range(-1.2..-0.8),  // By_R
         rng.gen_range(0.60..0.90),  // Bx
+    ]
+}
+
+/// Draw a single 7-vector from the widened Week-6 distribution.
+///
+/// Widening, driven by Q10 findings at `notes/plasma/002-mlp-failure-modes.md`:
+/// - By_L sign randomized (By_R always opposite), so models can't memorize
+///   `By_L > 0`.
+/// - rho_R widened from `[0.10, 0.15]` to `[0.05, 0.40]`.
+/// - Bx widened from `[0.60, 0.90]` to `[0.0, 1.5]`.
+pub fn sample_params_wide(rng: &mut StdRng) -> [f32; 7] {
+    let by_l_sign: f32 = if rng.gen_bool(0.5) { 1.0 } else { -1.0 };
+    let by_l_mag: f32 = rng.gen_range(0.8..1.2);
+    let by_r_mag: f32 = rng.gen_range(0.8..1.2);
+    [
+        rng.gen_range(0.8..1.2),       // rho_L
+        rng.gen_range(0.8..1.2),       // p_L
+        by_l_sign * by_l_mag,          // By_L (sign randomized)
+        rng.gen_range(0.05..0.40),     // rho_R
+        rng.gen_range(0.08..0.12),     // p_R
+        -by_l_sign * by_r_mag,         // By_R (opposite sign of By_L)
+        rng.gen_range(0.0..1.5),       // Bx
     ]
 }
 
@@ -95,11 +117,24 @@ pub struct Dataset {
 }
 
 pub fn build_dataset(n_examples: usize, seed: u64) -> Dataset {
+    build_dataset_from(n_examples, seed, sample_params)
+}
+
+/// Build a dataset from the widened Week-6 distribution.
+pub fn build_dataset_wide(n_examples: usize, seed: u64) -> Dataset {
+    build_dataset_from(n_examples, seed, sample_params_wide)
+}
+
+fn build_dataset_from(
+    n_examples: usize,
+    seed: u64,
+    sampler: fn(&mut StdRng) -> [f32; 7],
+) -> Dataset {
     let mut rng = StdRng::seed_from_u64(seed);
     let mut inputs = Vec::with_capacity(n_examples);
     let mut outputs = Vec::with_capacity(n_examples);
     for _ in 0..n_examples {
-        let params = sample_params(&mut rng);
+        let params = sampler(&mut rng);
         let out = run_one(&params); // (4, N_OUT)
         let mut flat = [0.0_f32; N_OUTPUTS];
         for f in 0..4 {
