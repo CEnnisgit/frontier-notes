@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["mhd-1d", "mhd-ml-bridge"]
+members = ["mhd-1d", "mhd-ml-bridge", "rl-control-toy"]
 
 [workspace.package]
 edition = "2024"
